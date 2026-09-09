@@ -18,7 +18,7 @@ from playwright.async_api import async_playwright
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-TOKEN = "8222667773:AAHx9yFnP9Ra_fGAxcj0z-u3soFUUiqSbmQ"
+TOKEN = "8824915756:AAEYK27n7r3uLATXvJo8yej9A-iuF6ZDHmo"
 GROUP_ID = -1004339334563
 MAIL_API = "https://cair.eu.cc"
 MAIL_DOMAINS = ["@cair.eu.cc", "@busa.eu.cc", "@besi.eu.cc"]
