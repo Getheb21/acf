@@ -45,4 +45,4 @@ RUN playwright install chromium
 
 COPY . .
 
-CMD uvicorn bot:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD ["python", "bot.py"]
