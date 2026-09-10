@@ -41,9 +41,6 @@ def timestamp() -> str:
 
 
 class TempMail:
-    def __init__(self):
-        self.session = None
-
     async def create(self) -> dict:
         domain = random.choice(MAIL_DOMAINS)
         name = "".join(random.choices(string.ascii_lowercase + string.digits, k=10))
@@ -70,7 +67,6 @@ class TempMail:
 
 
 async def wait_for_verification_link(jwt: str, timeout: int = 180) -> str:
-    """Polling email buat link verifikasi."""
     start = asyncio.get_event_loop().time()
 
     while (asyncio.get_event_loop().time() - start) < timeout:
@@ -102,7 +98,6 @@ async def wait_for_verification_link(jwt: str, timeout: int = 180) -> str:
 
 
 async def wait_for_otp(jwt: str, timeout: int = 180) -> str:
-    """Polling email buat OTP."""
     start = asyncio.get_event_loop().time()
 
     while (asyncio.get_event_loop().time() - start) < timeout:
@@ -137,7 +132,6 @@ async def create_cloudflare_account(update: Update, context: ContextTypes.DEFAUL
 
     password = generate_password()
 
-    # Create email
     mail = TempMail()
     try:
         mail_data = await mail.create()
@@ -157,11 +151,9 @@ async def create_cloudflare_account(update: Update, context: ContextTypes.DEFAUL
         page = await browser.new_page(viewport={"width": 1280, "height": 720})
 
         try:
-            # Signup
             await page.goto("https://dash.cloudflare.com/sign-up", timeout=60000, wait_until="domcontentloaded")
             await asyncio.sleep(10)
 
-            # Fill form
             try:
                 await page.fill('input[name="email"]', email)
                 await asyncio.sleep(1)
@@ -171,10 +163,8 @@ async def create_cloudflare_account(update: Update, context: ContextTypes.DEFAUL
                 await context.bot.send_message(chat_id=chat_id, text=f"❌ Form error: {e}")
                 return {"status": "error"}
 
-            # Tunggu Turnstile (auto-solve kadang bisa)
             await asyncio.sleep(5)
 
-            # Submit
             try:
                 await page.click('button[type="submit"]')
                 await asyncio.sleep(15)
@@ -182,23 +172,18 @@ async def create_cloudflare_account(update: Update, context: ContextTypes.DEFAUL
                 await context.bot.send_message(chat_id=chat_id, text=f"❌ Submit error: {e}")
                 return {"status": "error"}
 
-            # Cek redirect
-            url = page.url
             await asyncio.sleep(5)
             url = page.url
 
             match = re.search(r"/([a-f0-9]{32})", url)
             if not match:
-                # Coba screenshot buat debug
                 await page.screenshot(path=f"debug_{chat_id}.png")
-                await context.bot.send_message(chat_id=chat_id, text="❌ Signup gagal (Turnstile/rate limit)")
+                await context.bot.send_message(chat_id=chat_id, text="❌ Signup gagal")
                 return {"status": "error"}
 
             account_id = match.group(1)
             await context.bot.send_message(chat_id=chat_id, text=f"🆔 `{account_id}`", parse_mode="Markdown")
 
-            # Verify email
-            await context.bot.send_message(chat_id=chat_id, text="📧 Verifikasi email...")
             verify_link = await wait_for_verification_link(jwt)
 
             if verify_link:
@@ -208,12 +193,9 @@ async def create_cloudflare_account(update: Update, context: ContextTypes.DEFAUL
             else:
                 await context.bot.send_message(chat_id=chat_id, text="⚠️ Verifikasi timeout")
 
-            # Request OTP
-            await context.bot.send_message(chat_id=chat_id, text="🔐 Request OTP...")
             await page.goto("https://dash.cloudflare.com/profile/api-tokens", timeout=60000)
             await asyncio.sleep(10)
 
-            # Trigger reauthenticate
             await page.evaluate("""
                 (async () => {
                     await fetch('/api/v4/user/reauthenticate', {
@@ -224,8 +206,6 @@ async def create_cloudflare_account(update: Update, context: ContextTypes.DEFAUL
                 })()
             """)
 
-            # Polling OTP
-            await context.bot.send_message(chat_id=chat_id, text="⏳ Menunggu OTP...")
             otp = await wait_for_otp(jwt)
 
             if not otp:
@@ -234,17 +214,11 @@ async def create_cloudflare_account(update: Update, context: ContextTypes.DEFAUL
 
             await context.bot.send_message(chat_id=chat_id, text=f"🔑 OTP: `{otp}`", parse_mode="Markdown")
 
-            # Get API Key
-            await context.bot.send_message(chat_id=chat_id, text="🎯 Ambil Global API Key...")
-            await asyncio.sleep(5)
-
-            # Coba Turnstile lagi
             await asyncio.sleep(5)
 
             result = await page.evaluate(f"""
                 (async () => {{
-                    const cfToken = document.querySelector('input[name="cf-turnstile-response"]')?.value || 
-                                   document.querySelector('input[name="cf_challenge_response"]')?.value || '';
+                    const cfToken = document.querySelector('input[name="cf-turnstile-response"]')?.value || '';
                     const body = {{
                         password: "{otp}",
                         cf_challenge_response: cfToken
@@ -266,7 +240,6 @@ async def create_cloudflare_account(update: Update, context: ContextTypes.DEFAUL
             except Exception:
                 api_key = ""
 
-            # Save result
             result_data = {
                 "email": email,
                 "password": password,
@@ -289,7 +262,6 @@ async def create_cloudflare_account(update: Update, context: ContextTypes.DEFAUL
             with open(results_file, "w") as f:
                 json.dump(results, f, indent=2)
 
-            # Send result
             final_text = (
                 f"✅ **AKUN CLOUDFLARE!**\n\n"
                 f"📧 `{email}`\n"
